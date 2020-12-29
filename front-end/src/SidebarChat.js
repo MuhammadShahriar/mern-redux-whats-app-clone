@@ -1,8 +1,13 @@
 import { Avatar } from '@material-ui/core';
 import Badge from '@material-ui/core/Badge';
 import { makeStyles, withStyles } from '@material-ui/core/styles';
+import axios from './axios';
 import React from 'react'
 import './SidebarChat.css'
+import { useDispatch, useSelector } from 'react-redux';
+import { selectUser } from './features/userSlice';
+import Swal from 'sweetalert2'
+import { initCurrChat } from './features/currChatSlice';
 
 
 const StyledBadge = withStyles((theme) => ({
@@ -53,15 +58,87 @@ const useStyles = makeStyles((theme) => ({
 
 function SidebarChat({name, addNewChat}) {
     const classes = useStyles();
+    const user = useSelector(selectUser);
+    const dispatch = useDispatch();
+
+    
+    const initChat = () => {
+      dispatch((initCurrChat({
+          email: name,
+      })));
+    }
+
     
     const createChat = () => {
-        const roomName = prompt ( "Enter a room name" );
+        const email = prompt ( "Enter a room name" );
+
+        if ( email === user.email ) {
+          Swal.fire({
+            title: 'Hey...',
+            icon: 'info',
+            text: 'Its your account'
+          });
+
+          return;
+        }
+
+        axios.get(`/user/search?email=${email}`).then((response) => {
+          console.log("User axiest", response.data.length);
+
+          if ( response.data.length > 0 ) {
+            axios.get(`/friendship/search?user=${user.email}&friend=${email}`).then((response) => {
+              console.log("friendship axiest", response.data.count);
+
+              if ( response.data.count === 0 ) {
+
+                axios.post ('/friendship/new', {
+                  "user": user.email,
+                  "friend": email,
+                  "timestamp": new Date(),
+                }).catch(err => {
+                  console.error(err);
+                });
+
+                
+                axios.post ('/friendship/new', {
+                  "user": email,
+                  "friend": user.email,
+                  "timestamp": new Date(),
+                }).catch(err => {
+                  console.error(err);
+                });
+
+                Swal.fire(
+                  'Now you both are friends!',
+                  'Friend ship has been created!',
+                  'success'
+                )
+              }
+
+              else {
+                Swal.fire({
+                  title: 'Hey...',
+                  icon: 'info',
+                  text: 'You both are already friends'
+                });
+              }
+            });
+          }
+
+          else {
+            Swal.fire({
+              icon: 'error',
+              title: 'Oops...',
+              text: 'User not found',
+            })
+          }
+        });
     };
 
 
     return !addNewChat ? (
  
-        <div className = "sidebarChat" >
+        <div onClick = {initChat} className = "sidebarChat" >
             <StyledBadge
                 overlap="circle"
                 anchorOrigin={{

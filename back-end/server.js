@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const http = require('http');
 const userData = require('./dbUser.js');
+const firendShipData = require ( './dbFriendShip.js' );
 const cors = require('cors');
 
 // app config
@@ -53,9 +54,11 @@ const db = mongoose.connection;
 db.once('open', ()=>{
     const chatList = db.collection("messagecontents");
     const userDB = db.collection("userdatas");
+    const friendShipDB = db.collection("friendshipdatas");
     
     io.on('connection', (socket) => {
-        console.log("New clint");
+        const id = socket.handshake.query.id
+        socket.join(id)
 
         socket.on('sendMessage', ({message, sender, receiver, timestamp, status}) => {
             chatList.insertOne(
@@ -67,9 +70,9 @@ db.once('open', ()=>{
                   "status": status
                 }
              );
+             console.log(id, receiver, sender);
 
-            console.log(message)
-            socket.emit ( "recieveMessage", {
+             socket.broadcast.to(receiver).emit ( "recieveMessage", {
                 message: message,
                 sender: sender,
                 receiver: receiver,
@@ -116,49 +119,74 @@ db.once('open', ()=>{
             }
         )
     } );
+
     
+    app.get('/user/search', async (req, res) => {
+
+        const email = req.query.email;
+        console.log(email);
+        
+        await userDB.find({"email" : email },{  projection: { _id: 0, name: 1, email : 1 } } ).toArray((err, data) => {
+            if ( err ) {
+                res.json(500, err);
+                return;
+            }
+            console.log(data);
+            res.json(200, data);
+        });
+    });
+
+    app.get('/friendship/search', async (req, res) => {
+
+        const user = req.query.user;
+        const friend = req.query.friend;
+        console.log(user, friend);
+        
+        
+        const Count = await friendShipDB.countDocuments( {"user": user, "friend" : friend }, { limit: 1 }).catch((err) => {
+            res.json(500, err);
+            return;
+        });
+        
+        console.log(Count)
+        res.json(200, {count: Count});
+    });
+
+    
+    app.get('/friendList/sync', async (req, res) => {
+
+        const user = req.query.user;
+        console.log(user);
+        
+        await friendShipDB.find({"user" : user },{  projection: { _id: 0, friend: 1, timestamp: 1 } } ).toArray((err, data) => {
+            if ( err ) {
+                res.json(500, err);
+                return;
+            }
+            res.json(200, data);
+        });
+    });
+    
+    
+    app.get('/chat/sync', async (req, res) => {
+
+        const user = req.query.user;
+        const friend = req.query.friend;
+        //console.log(user, friend);
+        
+        await chatList.find(
+            {$or:[{"sender" : user, "receiver" : friend}, {"sender" : friend, "receiver" : user}]} ).toArray((err, data) => {
+                if ( err ) {
+                    res.json(500, err);
+                    return;
+                }
+                //console.log(data);
+                res.json(200, data);
+            });
+    });
 
 });
 
-// app.get( '/user/sync', (req, res) => {
-//     //count({/* criteria */}, { limit: 1 })
-//     userData.find (( err, data ) => {
-//         if ( err ) {
-//             res.status(500).send(err);
-//         }
-//         else {
-//             res.status(200).send(data);
-//         }
-//     } );
-// } );
-
-// app.get('/user/sync', async function(req, res) {
-
-//     // Access the provided 'page' and 'limt' query parameters
-//     //const email = req.query.email;
-//     //let limit = req.query.limit;
-
-//     //const Count = await userData.findAll().paginate({page: page, limit: limit}).exec();
-//     userDB = db.collection("userdatas");
-    
-//     const Count = await userDB.count({"email": "String"}, { limit: 1 })
-
-//     // Return the articles to the rendering engine
-    
-//     res.status(200).send(Count);
-// });
-
-// db.collection.update(
-//     { _id: ObjectId("557914833ac61e518e6103ab") }, //update doc with this id
-//     { $set:
-//        {
-//          "dataValue.default": [
-//           "default A", 
-//           "default B" 
-//           ]
-//        }
-//     }
-//  )
 
 const corsOptions = {
     origin: "http://localhost:3000",
@@ -180,18 +208,24 @@ app.post ( '/user/new', cors(corsOptions), (req, res, next) => {
     });
 } );
 
-// app.post ( "userdata/update", cors(corsOptions), (req, res, next) => {
-//     const dbData = req.body
 
-//     userData.create(dbData, (err, data)=>{
-//         if (err) {
-//             res.status(500).send(err);
-//         }
-//         else{
-//             res.status(201).send(data);
-//         }
-//     });
-// } );
+
+
+
+app.get ( '/friendship/new', cors(corsOptions), (req, res, next) => {
+    const dbData = req.body
+
+    firendShipData.create(dbData, (err, data)=>{
+        if (err) {
+            res.status(500).send(err);
+        }
+        else{
+            res.status(201).send(data);
+        }
+    });
+} );
+
+
 
 
 

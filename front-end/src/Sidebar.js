@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import './Sidebar.css'
 import { Avatar, Button, IconButton } from '@material-ui/core';
 import SearchIcon from '@material-ui/icons/Search';
@@ -8,12 +8,18 @@ import ChatIcon from '@material-ui/icons/Chat';
 import SidebarChat from './SidebarChat';
 import { auth } from './firebase';
 import axios from './axios';
-import { useSelector } from 'react-redux';
-import { selectUser } from './features/userSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { login, selectUser } from './features/userSlice';
+import { initCurrChat, selectCurrChat } from './features/currChatSlice';
 
 function Sidebar() {
 
     const user = useSelector(selectUser);
+    const [friendList, setFriendList] = useState([]);
+    ///const [currentFriend, setCurrentFriend] = useState("");
+    var cr = "";
+    const friendChat = useSelector(selectCurrChat);
+    const dispatch = useDispatch();
 
     const singOut = () => {
         axios.post( `/user/logout?email=${user.email}` )
@@ -24,6 +30,18 @@ function Sidebar() {
 
         auth.signOut()
     }
+
+
+    useEffect (() => {
+        axios.get (`/friendList/sync?user=${user.email}`)
+            .then((response) => {
+                console.log("hey", response.data)
+                setFriendList(response.data);
+            })
+            .catch((err) => {
+                console.log(err);
+            })
+    }, []);
 
 
     return (
@@ -62,18 +80,21 @@ function Sidebar() {
             
             <div className = "sidebar__chats">
                 <SidebarChat addNewChat />
+                {console.log("friend", friendList)}
+                
+
+                { friendList.map ( (val, id) => (
+                    
+                        <SidebarChat
+                            key = {id}
+                            name = {val.friend}
+                        />
+                )) }
+
                 <SidebarChat 
-                    name = "Shahriar"
+                    name = "js"
                 />
-                <SidebarChat 
-                    name = "Shahriar"
-                />
-                <SidebarChat 
-                    name = "Shahriar"
-                />
-                <SidebarChat
-                    name = "Shahriar"
-                />
+                
 
             </div>
             

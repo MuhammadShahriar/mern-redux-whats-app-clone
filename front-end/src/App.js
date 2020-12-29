@@ -8,10 +8,11 @@ import Login from './Login';
 import { auth } from './firebase';
 import { login, selectUser, logout } from './features/userSlice';
 import axios from './axios';
+import { SocketProvider, useSocket } from './SocketProvider';
 const ENDPOINT = "http://localhost:9000";
 
 function App() {
-  const [socket, setSocket] = useState(io(ENDPOINT));
+  const socket = useSocket();
   const dispatch = useDispatch();
   const user = useSelector(selectUser);
 
@@ -63,10 +64,10 @@ function App() {
     <div className="app">
       <div className = "app__body">
         {(user)? (
-          <>
+          <SocketProvider id = {user.email}>
             <Sidebar />
             <Chat />
-          </>
+          </SocketProvider>
         ) : (
           <Login />
         )}

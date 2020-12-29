@@ -9,37 +9,79 @@ import io from "socket.io-client";
 import MicIcon from '@material-ui/icons/Mic';
 import { useSelector } from 'react-redux';
 import { selectUser } from './features/userSlice';
+import { selectCurrChat } from './features/currChatSlice';
+import axios from './axios';
+import Swal from 'sweetalert2';
+import { useSocket } from './SocketProvider';
 const ENDPOINT = "http://localhost:9000";
 
 function Chat() {
-    const [socket, setSocket] = useState(io(ENDPOINT));
-    const [input, setInput] = useState("");
+    const socket = useSocket();
+    const [input, setInput] = useState(() => {
+        return "";
+    });
+    const [messages, setMessages] = useState(() => {
+        return [];
+    });
     const user = useSelector(selectUser);
-    const [messages, setMessages] = useState("ok");
+    const friend = useSelector(selectCurrChat);
 
     useEffect(() => {
-        socket.on('recieveMessage', ({message, sender, receiver, timestamp, status}) => {
-            if ( sender === user.email ) {
-                //setMessages( ...messages, {message, sender, receiver, timestamp, status} );
-                setMessages(message);
+        if (socket == null) return;
+        socket.on('recieveMessage', (data) => {
+            const msg = {
+                message: data.message,
+                sender: data.sender,
+                receiver: data.receiver,
+                timestamp: data.timestamp,
+                status: "seen"
             }
 
-            //console.log("Yes", message, user.email)
+            setMessages ( (preV) => {
+                return [...preV, msg]
+            });
+            
         });
 
-        //console.log(messages)
+        return () => socket.off('recieveMessage')
     }, [socket])
+
+    useEffect(() => {
+        if(user && friend ) {
+            setMessages([]);
+            axios.get(`/chat/sync?user=${user.email}&friend=${friend.email}`).then((response) => {
+                
+                response.data.forEach( (item) => {
+                    const msg = {
+                        message: item.message,
+                        sender: item.sender,
+                        receiver: item.receiver,
+                        timestamp: item.timestamp,
+                        status: "seen"
+                    }
+                    setMessages ( (preV) => {
+                        return [...preV, msg];
+                    });
+                });
+
+            });
+        }
+    }, [user, friend])
 
     const sendMessage = (e) => {
         e.preventDefault();
 
-        socket.emit ( "sendMessage", {
+        const msg = {
             message: input,
             sender: user.email,
-            receiver: "shahriarcsecu76@gmail.com",
+            receiver: friend.email,
             timestamp: new Date(),
             status: "seen"
-        } );
+        }
+        socket.emit ( "sendMessage", msg);
+        setMessages ( (preV) => {
+            return [...preV, msg];
+        });
 
         setInput ("");
     }
@@ -50,7 +92,12 @@ function Chat() {
                  <Avatar src = "https://scontent-hkt1-1.xx.fbcdn.net/v/t1.0-9/118589703_1025868897884938_4756722051990937297_n.jpg?_nc_cat=105&ccb=2&_nc_sid=09cbfe&_nc_eui2=AeGND08fnLT9_xk4yAYKaGJn2ujioMMe0zza6OKgwx7TPJOZtKu8I532frG8UBMFLtQEo0kIsWGSsGd0nFZrminD&_nc_ohc=wSOQYVJi9Z8AX-jL5KK&_nc_ht=scontent-hkt1-1.xx&oh=0e7174a4e18bce7ab9e79b362ac39949&oe=5FED9E3D" />
 
                 <div className = "chat__headerInfo">
-                    <h3>Shahriar</h3>
+                    { friend?(
+                    <h3>   {friend.email}</h3>
+
+                    ) : (
+                        <h3>No one</h3>
+                    ) }
                     <p>last seen</p>
                 </div>
 
@@ -69,32 +116,22 @@ function Chat() {
 
             
             <div className = "chat__body">
-                <div className = {`chat__message tooltiptail ${true && "chat__receiver"}`}>
-                    <p className = "chat__messageText" >
-                    hey this is big message. just for testing
-
-For each node (for example x), we keep three integers : 1.t[x] = Answer for it's interval. 2. o[x] = The number of $($s after deleting the brackets who belong to the correct bracket sequence in this interval whit length t[x]. 3. c[x] = The number of $)$s after deleting the brackets who belong to the correct bracket sequence in this interval whit length t[x]
-                    </p>
-                    <span className = "chat__timestamp">
-                        12:34
-                    </span>
-                </div>
-
-                
-                <div className = {`chat__message`}>
-                    <p className = "chat__messageText" >
-                    hey this is big message. just for testing
-
-For each node (for example x), we keep three integers : 1.t[x] = Answer for it's interval. 2. o[x] = The number of $($s after deleting the brackets who belong to the correct bracket sequence in this interval whit length t[x]. 3. c[x] = The number of $)$s after deleting the brackets who belong to the correct bracket sequence in this interval whit length t[x]
-                    </p>
-                    <span className = "chat__timestamp">
-                        00:49
-                    </span>
-                </div>
+                {
+                    messages.map ((messageDetail, id) => (
+                        
+                    <div key = {id} className = {`chat__message tooltiptail ${messageDetail.sender === user.email && "chat__receiver"}`}>
+                        <p className = "chat__messageText" >
+                            {messageDetail.message}
+                        </p>
+                        {/* <span className = "chat__timestamp">
+                            {messageDetail.timestamp}
+                        </span> */}
+                    </div>
+                    ))
+                }
 
             </div>
             
-            <p> {messages} </p>
 
             
             <div className = "chat__footer">
